@@ -21,18 +21,22 @@ def detectTemplate(frame):
             return border;
     return False
 
-def detectSIFT(frame):
+def detectSIFT(frame, contour):
     kp, desc = sift.detectAndCompute(frame, None)
     best = 0
     bestID = -1
     bestMatches = False
     for i in range(12):
+        if i == 6:
+            ratio = 0.6
+        else:
+            ratio = 0.5
         matches = bf.knnMatch(siftDesc[i], desc, k=2)
         validMatches = []
         if len(matches) != 0 and len(matches[0]) == 2:
             avr = 0
             for m, n in matches:
-                if m.distance / n.distance < 0.5:
+                if min(m.distance / n.distance, n.distance / m.distance) < ratio and cv.pointPolygonTest(contour, kp[n.queryIdx].pt, True) <= 0:
                     validMatches.append(m)
                     avr += m.distance / n.distance
             if len(validMatches) != 0:
@@ -93,8 +97,8 @@ def main():
         print("Failed to open camera")
         exit();
 
-    centerX = 0
-    centerY = 0
+    centerX = vid.get(cv.CAP_PROP_FRAME_WIDTH)/2
+    centerY = vid.get(cv.CAP_PROP_FRAME_HEIGHT)/2
 
     dx = 0
     dy = 0
@@ -103,11 +107,6 @@ def main():
         
         if not ret:
             print("Failed to recieve frame")
-
-        if centerX == 0 and centerY == 0:
-            w, h = frame.shape[:2]
-            centerX = w/2
-            centerY = h/2
 
         #filter out green
         filtered = cv.cvtColor(frame, cv.COLOR_BGR2HSV)
@@ -127,12 +126,16 @@ def main():
             M = cv.moments(contours[0])
             targetX = int(M["m10"] / M["m00"])
             targetY = int(M["m01"] / M["m00"])
+            cv.circle(frame, (targetX, targetY), 5, (0, 255, 0), -1)
             dx = centerX - targetX
             dy = centerY - targetY
             print("(" + str(dx) + ", " + str(dy) + ")")
 
         kp, desc = sift.detectAndCompute(filtered, None)
-        detect = detectSIFT(filtered)
+        if len(contours) != 0:
+            detect = detectSIFT(filtered, contours[0])
+        else:
+            detect = False
         if detect != False:
             frame = cv.drawMatches(templates[detect[0]], siftKP[detect[0]], frame, kp, detect[1], None, flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
 
