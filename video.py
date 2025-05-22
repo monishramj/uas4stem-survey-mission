@@ -36,7 +36,8 @@ def detectSIFT(frame, contour):
         if len(matches) != 0 and len(matches[0]) == 2:
             avr = 0
             for m, n in matches:
-                if min(m.distance / n.distance, n.distance / m.distance) < ratio and cv.pointPolygonTest(contour, kp[n.queryIdx].pt, True) <= 0:
+                if min(m.distance / n.distance, n.distance / m.distance) < ratio:
+                #if min(m.distance / n.distance, n.distance / m.distance) < ratio and cv.pointPolygonTest(contour, kp[n.queryIdx].pt, True) <= 0:
                     validMatches.append(m)
                     avr += m.distance / n.distance
             if len(validMatches) != 0:
@@ -59,6 +60,10 @@ def findPOI(frame):
     validContours = []
     for i in range(len(contours)):
         contour = contours[i]
+
+        #check area
+        if cv.contourArea(contour) < 150:
+            continue
 
         #check solidity
         hull = cv.convexHull(contour)
@@ -84,7 +89,7 @@ def findPOI(frame):
 
 def main():
     for i in range(12):
-        templates.append(cv.imread('templates/' + str(i+1) + '.png', cv.IMREAD_GRAYSCALE))
+        templates.append(cv.imread('images/' + str(i+1) + '.png', cv.IMREAD_GRAYSCALE))
         templates[i] = cv.resize(templates[i], None, fx=0.5, fy=0.5, interpolation=cv.INTER_AREA)
         templateSizes.append(templates[i].shape[::-1])
         kp, desc = sift.detectAndCompute(templates[i], None)
@@ -100,6 +105,8 @@ def main():
     centerX = vid.get(cv.CAP_PROP_FRAME_WIDTH)/2
     centerY = vid.get(cv.CAP_PROP_FRAME_HEIGHT)/2
 
+    out = cv.VideoWriter('output.avi', cv.VideoWriter_fourcc(*'MJPG'), 60.0, (640, 480))
+
     dx = 0
     dy = 0
     while True:
@@ -107,6 +114,7 @@ def main():
         
         if not ret:
             print("Failed to recieve frame")
+
 
         #filter out green
         filtered = cv.cvtColor(frame, cv.COLOR_BGR2HSV)
@@ -139,11 +147,12 @@ def main():
         if detect != False:
             frame = cv.drawMatches(templates[detect[0]], siftKP[detect[0]], frame, kp, detect[1], None, flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
 
-
+        out.write(frame)
         cv.imshow('stream', frame)
         if cv.waitKey(1) == ord('q'):
             break;
 
+    out.release()
     vid.release()
     cv.destroyAllWindows()
 
