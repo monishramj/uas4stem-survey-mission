@@ -9,18 +9,6 @@ templateSizes = []
 siftKP = []
 siftDesc = []
 
-def detectTemplate(frame):
-    for i in range(12):
-        w, h = templateSizes[i]
-        template = templates[i]
-        res = cv.matchTemplate(frame, template, cv.TM_CCOEFF_NORMED)
-        minVal, maxVal, minLoc, maxLoc = cv.minMaxLoc(res)
-        if maxVal > 0.7:
-            border = [maxLoc, (maxLoc[0] + w, maxLoc[1] + h)]
-            print("detected: " + str(i+1))
-            return border;
-    return False
-
 def detectSIFT(frame, contour):
     kp, desc = sift.detectAndCompute(frame, None)
     best = 0
