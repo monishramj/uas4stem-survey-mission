@@ -10,7 +10,7 @@ siftKP = []
 siftDesc = []
 
 def detectSIFT(frame, contour):
-    kp, desc = sift.detectAndCompute(frame, None)
+    kp, desc = sift.detectAndCompute(frame, None) # https://amroamroamro.github.io/mexopencv/matlab/cv.SIFT.detectAndCompute.html
     best = 0
     bestID = -1
     bestMatches = False
@@ -19,7 +19,7 @@ def detectSIFT(frame, contour):
             ratio = 0.6
         else:
             ratio = 0.5
-        matches = bf.knnMatch(siftDesc[i], desc, k=2)
+        matches = bf.knnMatch(siftDesc[i], desc, k=2) # https://docs.opencv.org/3.4/dc/dc3/tutorial_py_matcher.html
         validMatches = []
         if len(matches) != 0 and len(matches[0]) == 2:
             avr = 0
