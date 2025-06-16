@@ -19,7 +19,7 @@ startTime = time.time();
 while time.time() - startTime < 5:
     print("Altitude: " + vehicle.location.global_relative_frame.alt)
     if vehicle.location.global_relative_frame.alt >= targetAlt*0.95:
-        print "Reached target altitude"
+        print("Reached target altitude")
         break
         time.sleep(1)
 
