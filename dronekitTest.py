@@ -40,7 +40,7 @@ while time.time() - startTime < 5:
     print("Altitude: " + vehicle.location.global_relative_frame.alt)
     vehicle.send_mavlink(msg)
     if vehicle.location.global_relative_frame.alt <= 0.25:
-        print "Landed"
+        print("Landed")
         break
         time.sleep(1)
 
