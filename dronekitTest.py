@@ -1,5 +1,5 @@
 from dronekit import connect
-import Time
+import time
 
 targetAlt = 50
 
