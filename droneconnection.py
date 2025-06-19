@@ -13,6 +13,12 @@ msg = vehicle.message_factory.command_long_encode(
 
 vehicle.send_mavlink(msg)
 
+response = vehicle.recv_match(type='COMMAND_ACK', blocking=True)
+if response and response.command == mavutil.mavlink.MAV_CMD_SET_MESSAGE_INTERVAL and response.result == mavutil.mavlink.MAV_RESULT_ACCEPTED:
+    print("Command accepted")
+else:
+    print("Command failed")
+
 # from pymavlink import mavutil
 
 # testmsg = 'Hello world!' # max 50 char
