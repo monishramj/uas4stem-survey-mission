@@ -1,8 +1,8 @@
 from dronekit import connect, VehicleMode, mavutil
 import time
 
-targetAlt = 4  # in meters
-convertedAlt = targetAlt * 0.3048
+targetAlt = 6  # in feet
+convertedAlt = targetAlt * 0.3048 # in meters
 
 startTime = time.time()
 print("Start at 0 seconds")
