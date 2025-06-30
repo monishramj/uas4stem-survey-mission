@@ -1,7 +1,7 @@
 from dronekit import connect, VehicleMode, mavutil
 import time
 
-targetAlt = 6  # in feet
+targetAlt = 5  # in feet
 convertedAlt = targetAlt * 0.3048 # in meters
 
 startTime = time.time()
@@ -33,7 +33,7 @@ while True:
         break
     time.sleep(1)
 
-print("Start hovering for 10 seconds")
+print("Start hovering for 5 seconds")
 
 vehicle.mode = VehicleMode("BRAKE")
 vehicle.armed = False
@@ -42,7 +42,7 @@ while not vehicle.mode.name=='BRAKE' and vehicle.armed:
     time.sleep(1)
 
 print(f"Hovering. Time: {time.time() - startTime}")
-time.sleep(10)
+time.sleep(5)
 print(f"Hovering done. Time: {time.time() - startTime}. Landing.")
 
 vehicle.mode = VehicleMode("LAND")
