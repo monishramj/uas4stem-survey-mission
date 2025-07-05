@@ -1,6 +1,6 @@
 # SkyCats UAS4STEM Survey Mission
 A computer vision algorithm that allows an aerial 'drone' vehicle to survey a field and identify ground targets for the [UAS4STEM Beginner Division competition](https://amablog.modelaircraft.org/uas4stem/). This repository is the collaborative space for SkyCats' project, a team localized at Neuqua Valley High School.
-> Updated from Vick Ye's UAS4STEM *"UA4STEM"* template image identification algorithm.
+> Updated from Vick Ye's UAS4STEM [*"UA4STEM"*](https://github.com/Vick-Ye/UA4STEM) template image identification algorithm.
 
 ## Build
 - **Holybro X500 V2** as our UAV base 
