@@ -10,3 +10,19 @@
 # 8. get gps coordinates
 # 9. run opencv to determine image type
 # 10. go back to initial gps and land
+
+from dronekit import connect, VehicleMode, mavutil, LocationLocal
+import time
+# original movement test written by Nidhish
+
+targetAlt = 5  # in feet
+convertedAlt = targetAlt * 0.3048 # in meters
+
+startTime = time.time()
+print("Start at 0 seconds")
+
+vehicle = connect(ip='/dev/ttyAMA0', wait_ready=True, baud=115200)  # baud rate changed from 57600
+
+while not vehicle.is_armable:
+    print("Waiting to initialise...")
+    time.sleep(1)
