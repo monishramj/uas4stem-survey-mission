@@ -1,14 +1,39 @@
-from dronekit import connect, VehicleMode, mavutil, LocationLocal
-import time
+from dronekit import connect, VehicleMode, LocationGlobal
+import time, math
+from mavlink.pymavlink import mavutil
+
+def localCoordinate(vehicle, north, east, down): # function converts feet to new LocationGlobal 
+    start_pos = vehicle.location.global_frame
+    start_lat = start_pos.lat
+    start_lon = start_pos.lon
+    start_alt = start_pos.alt
+
+    north_m = north * .3048
+    east_m = east * .3048
+    down_m = down * .3048
+
+    R = 6378137.0
+
+    d_lat = north_m / R
+    d_lon = east_m / (R * math.cos(math.pi * start_lat / 180))
+
+    final_lat = start_lat + (d_lat * 180 / math.pi)
+    final_lon = start_lon + (d_lon * 180 / math.pi)
+    final_alt = start_alt - down_m
+
+    return LocationGlobal(final_lat, final_lon, final_alt)
 # original movement test written by Nidhish
 
 targetAlt = 5  # in feet
+
 convertedAlt = targetAlt * 0.3048 # in meters
 
 startTime = time.time()
 print("Start at 0 seconds")
 
 vehicle = connect(ip='/dev/ttyAMA0', wait_ready=True, baud=115200)  # baud rate changed from 57600
+
+vehicle.location.local_frame
 
 while not vehicle.is_armable:
     print("Waiting to initialise...")
@@ -50,9 +75,11 @@ print(f"Hovering done. Time: {time.time() - startTime}. Landing.")
 vehicle.mode = VehicleMode("GUIDED")
 
 # Set the target location in global-relative frame???
-print("Starting to move")
-a_location = LocationLocal(-5, 5, -3)
-vehicle.simple_goto(a_location)
+print(f"Starting to move, Global Frame: {vehicle.location.global_frame}")
+
+move = localCoordinate(vehicle, 5, 5, 0)
+print(f"New coordinates: {move}")
+vehicle.simple_goto(move)
 time.sleep(5)
 print("Moving finished")
 
