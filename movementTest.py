@@ -24,7 +24,7 @@ def localCoordinate(vehicle, north, east, down): # function converts feet to new
     return LocationGlobal(final_lat, final_lon, final_alt)
 # original movement test written by Nidhish
 
-targetAlt = 5  # in feet
+targetAlt = 20  # in feet
 
 convertedAlt = targetAlt * 0.3048 # in meters
 
