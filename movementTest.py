@@ -59,30 +59,13 @@ while True:
         break
     time.sleep(1)
 
-print("Start hovering for 5 seconds")
-
-vehicle.mode = VehicleMode("BRAKE")
-vehicle.armed = False
-while not vehicle.mode.name=='BRAKE' and vehicle.armed:
-    print("BRAKING")
-    time.sleep(1)
-
-print(f"Hovering. Time: {time.time() - startTime}")
-time.sleep(5)
-print(f"Hovering done. Time: {time.time() - startTime}. Landing.")
-
-
-vehicle.mode = VehicleMode("GUIDED")
-
-# Set the target location in global-relative frame???
 print(f"Starting to move, Global Frame: {vehicle.location.global_frame}")
-
 move = localCoordinate(vehicle, 5, 5, 0)
+
 print(f"New coordinates: {move}")
 vehicle.simple_goto(move)
 time.sleep(5)
 print("Moving finished")
-
 
 vehicle.mode = VehicleMode("LAND")
 vehicle.armed = False
