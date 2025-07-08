@@ -1,6 +1,6 @@
-from dronekit import connect, VehicleMode, LocationGlobal
+from dronekit import connect, VehicleMode, Vehicle, LocationGlobal
 import time, math
-from mavlink import mavutil
+from pymavlink import mavutil
 
 def send_ned_velocity(vehicle, north, east, altitude, duration):
    msg = vehicle.message_factory.set_position_target_local_ned_encode(
@@ -72,7 +72,7 @@ arm_takeoff(convertedAlt, vehicle)
 
 print(f"Starting to move Global Frame: {vehicle.location.global_frame}")
 send_ned_velocity(vehicle, 1, 0, 0, 5)
-print("Moving finished. Global Frame: {vehicle.location.global_frame}")
+print(f"Moving finished. Global Frame: {vehicle.location.global_frame}")
 
 land(vehicle)
 

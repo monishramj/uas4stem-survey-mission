@@ -1,6 +1,6 @@
 from dronekit import connect, VehicleMode, LocationGlobal
 import time, math
-from mavlink.pymavlink import mavutil
+from pymavlink import mavutil
 
 def create_local_coordinate(vehicle, north, east, down): # function converts feet to new LocationGlobal 
     start_pos = vehicle.location.global_frame
