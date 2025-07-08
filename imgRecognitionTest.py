@@ -1,7 +1,6 @@
 from dronekit import connect, VehicleMode
 from pymavlink import mavutil
-import time
-import video
+import time, video
 import numpy as np
 import cv2 as cv
 
@@ -22,10 +21,7 @@ siftDesc = []
 # 9. run opencv to determine image type
 # 10. go back to initial gps and land
 
-
-#! 1. connect x
-vehicle = connect(ip='/dev/ttyAMA0', wait_ready=True, baud=115200)  
-
+# 2 m/s ()
 def send_ned_velocity(vehicle, north, east, altitude, duration):
    msg = vehicle.message_factory.set_position_target_local_ned_encode(
         0,       # time_boot_ms (not used)
@@ -87,7 +83,12 @@ def land(vehicle):
         print("LANDING")
         time.sleep(1)
 
-arm_takeoff(altitude=20, vehicle=vehicle)
+#! 1. connect x
+print("trying to connect")
+vehicle = connect(ip='/dev/ttyAMA0', wait_ready=True, baud=115200)  
+
+#! 2. launch and save initial gps x
+arm_takeoff(30, vehicle)
 initial_pos = vehicle.location.global_frame
 
 start_hover(vehicle) #hover while it scans
@@ -104,7 +105,7 @@ if not vid.isOpened():
 centerX = vid.get(cv.CAP_PROP_FRAME_WIDTH)/2
 centerY = vid.get(cv.CAP_PROP_FRAME_HEIGHT)/2
 
-out = cv.VideoWriter('output.mp4', cv.VideoWriter_fourcc(*'MJPG'), 60.0, (640, 480))
+out = cv.VideoWriter('output.avi', cv.VideoWriter_fourcc(*'MJPG'), 60.0, (640, 480))
 
 dx = 0 #distance from center of img to center of screen
 dy = 0 #distance from center of img to center of screen

@@ -38,7 +38,7 @@ def arm_takeoff(alt, vehicle): # in feet
     
     return
 
-def change_alt(alt): # in feet
+def change_alt(alt, vehicle): # in feet
 
    alt = alt * 0.3048 # in meters
 
@@ -120,9 +120,9 @@ while True:
    if next_wp == wp_num:
       print(f"Waypoint {wp_num} reached. Executing maneuver")
       og_alt = vehicle.location.global_relative_frame.alt
-      change_alt(new_alt)
+      change_alt(new_alt, vehicle)
       print("Returning to original altitude...")
-      change_alt(og_alt)
+      change_alt(og_alt, vehicle)
       print("Maneuver complete. Resuming AUTO mission.")
       auto(vehicle)
    time.sleep(1)
