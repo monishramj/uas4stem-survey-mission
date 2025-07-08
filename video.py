@@ -88,7 +88,7 @@ def main():
     vid = cv.VideoCapture(0)
     if not vid.isOpened():
         print("Failed to open camera")
-        exit();
+        exit()
 
     centerX = vid.get(cv.CAP_PROP_FRAME_WIDTH)/2
     centerY = vid.get(cv.CAP_PROP_FRAME_HEIGHT)/2

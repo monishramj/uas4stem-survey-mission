@@ -13,5 +13,6 @@ Various test programs created to iteratively build upon our code to test functio
 - [x] <ins>video.py / stream.py</ins>: image recognition and feedback using OpenCV.
 - [x] <ins>hoverTest.py</ins>: basic flight test to hover the drone and gain latency feedback.
 - [x] (NEEDS TESTING) <ins>movementTest.py</ins>: basic flight movement test.
+- [x] (NEEDS TESTING) <ins>waypointOverride.py</ins>: movement test to interrupt waypoint mission for code control. 
 - [ ] (WIP) <ins>imgRecognition.py</ins>: movement test including image recognition for obtaining POI coordinates.
 - [ ] (WIP) <ins>searchMission.py</ins>: search flight to accurately determine GPS coordinates for field POIs from waypoint mission.

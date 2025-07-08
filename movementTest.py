@@ -2,7 +2,7 @@ from dronekit import connect, VehicleMode, LocationGlobal
 import time, math
 from mavlink.pymavlink import mavutil
 
-def localCoordinate(vehicle, north, east, down): # function converts feet to new LocationGlobal 
+def create_local_coordinate(vehicle, north, east, down): # function converts feet to new LocationGlobal 
     start_pos = vehicle.location.global_frame
     start_lat = start_pos.lat
     start_lon = start_pos.lon
@@ -60,10 +60,10 @@ while True:
     time.sleep(1)
 
 print(f"Starting to move, Global Frame: {vehicle.location.global_frame}")
-move = localCoordinate(vehicle, 5, 5, 0)
+move = create_local_coordinate(vehicle, 5, 5, 0)
 
 print(f"New coordinates: {move}")
-vehicle.simple_goto(move)
+vehicle.simple_goto(move, groundspeed=1.5)
 time.sleep(5)
 print("Moving finished")
 
