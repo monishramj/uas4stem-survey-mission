@@ -25,15 +25,12 @@ def create_local_coordinate(vehicle, north, east, down): # function converts fee
 # original movement test written by Nidhish
 
 targetAlt = 20  # in feet
-
 convertedAlt = targetAlt * 0.3048 # in meters
 
 startTime = time.time()
 print("Start at 0 seconds")
 
 vehicle = connect(ip='/dev/ttyAMA0', wait_ready=True, baud=115200)  # baud rate changed from 57600
-
-vehicle.location.local_frame
 
 while not vehicle.is_armable:
     print("Waiting to initialise...")
@@ -61,7 +58,6 @@ while True:
 
 print(f"Starting to move, Global Frame: {vehicle.location.global_frame}")
 move = create_local_coordinate(vehicle, 5, 5, 0)
-
 print(f"New coordinates: {move}")
 vehicle.simple_goto(move, groundspeed=1.5)
 time.sleep(5)
