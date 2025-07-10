@@ -36,6 +36,7 @@ while not vehicle.is_armable:
     print("Waiting to initialise...")
     time.sleep(1)
 
+timevarone = time.time()
 print(f"Time: {time.time() - startTime}")
 
 vehicle.mode = VehicleMode("GUIDED")
@@ -44,7 +45,9 @@ while not vehicle.mode.name == 'GUIDED' and not vehicle.armed:
     print("Arming")
     time.sleep(1)
 
+timevartwo = time.time()
 print(f"Armed. Time: {time.time() - startTime}")
+print(f"Armed. Time: {time.time() - timevarone}")
 print("Takeoff")
 
 vehicle.simple_takeoff(convertedAlt)
@@ -53,6 +56,8 @@ while True:
     print(f"Altitude:{vehicle.location.global_relative_frame.alt}")
     if vehicle.location.global_relative_frame.alt>= convertedAlt * 0.95:
         print(f"Reached target altitude. Time: {time.time() - startTime}")
+        print(f"Reached target altitude. Time: {time.time() - timevartwo}")
+        timevarthree = time.time()
         break
     time.sleep(1)
 
@@ -70,3 +75,4 @@ while vehicle.armed:
     time.sleep(1)
 
 print(f"DONE. Total time: {time.time() - startTime} LETS GOOO")
+print(f"DONE. Total time: {time.time() - timevarthree} LETS GOOO")
