@@ -1,27 +1,17 @@
-`
 import os
 import numpy as np
-import cv2 as cv
 from picamera2 import Picamera2
-from flask import Flask, render_template, Response
+import cv2 as cv
 
-app = Flask(__name__)
 sift = cv.xfeatures2d.SIFT_create()
 bf = cv.BFMatcher()
 templates = []
 templateSizes = []
 siftKP = []
 siftDesc = []
-for i in range(12):
-    templates.append(cv.imread('images/' + str(i+1) + '.png', cv.IMREAD_GRAYSCALE))
-    templates[i] = cv.resize(templates[i], None, fx=0.5, fy=0.5, interpolation=cv.INTER_AREA)
-    templateSizes.append(templates[i].shape[::-1])
-    kp, desc = sift.detectAndCompute(templates[i], None)
-    siftKP.append(kp)
-    siftDesc.append(desc)
 
 def detectSIFT(frame, contour):
-    kp, desc = sift.detectAndCompute(frame, None)
+    kp, desc = sift.detectAndCompute(frame, None) # https://amroamroamro.github.io/mexopencv/matlab/cv.SIFT.detectAndCompute.html
     best = 0
     bestID = -1
     bestMatches = False
@@ -30,7 +20,7 @@ def detectSIFT(frame, contour):
             ratio = 0.6
         else:
             ratio = 0.5
-        matches = bf.knnMatch(siftDesc[i], desc, k=2)
+        matches = bf.knnMatch(siftDesc[i], desc, k=2) # https://docs.opencv.org/3.4/dc/dc3/tutorial_py_matcher.html
         validMatches = []
         if len(matches) != 0 and len(matches[0]) == 2:
             avr = 0
@@ -85,18 +75,25 @@ def findPOI(frame):
     validContours.sort(key=lambda contour: -cv.contourArea(contour))
     return validContours
 
+def main():
+    for i in range(12):
+        templates.append(cv.imread('images/' + str(i+1) + '.png', cv.IMREAD_GRAYSCALE))
+        templates[i] = cv.resize(templates[i], None, fx=0.5, fy=0.5, interpolation=cv.INTER_AREA)
+        templateSizes.append(templates[i].shape[::-1])
+        kp, desc = sift.detectAndCompute(templates[i], None)
+        siftKP.append(kp)
+        siftDesc.append(desc)
 
-
-def gen_frames():
 
     WIDTH = 1280
     HEIGHT = 720
     vid = Picamera2()
     vid.configure(vid.create_video_configuration({"size": (WIDTH,HEIGHT)}))
-    vid.start()
 
     centerX = WIDTH/2
     centerY = HEIGHT/2
+
+    out = cv.VideoWriter('output.avi', cv.VideoWriter_fourcc(*'MJPG'), 60.0, (640, 480))
 
     dx = 0
     dy = 0
@@ -134,19 +131,13 @@ def gen_frames():
         if detect != False:
             frame = cv.drawMatches(templates[detect[0]], siftKP[detect[0]], frame, kp, detect[1], None, flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
 
-        retu, buffer = cv.imencode('.jpg', frame)
-        frame = buffer.tobytes()
-        yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+        out.write(frame)
+        cv.imshow('stream', frame)
+        if cv.waitKey(1) == ord('q'):
+            break;
 
-@app.route('/video_feed')
-def video_feed():
-        return Response(gen_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
+    out.release()
+    vid.release()
+    cv.destroyAllWindows()
 
-@app.route('/')
-def index():
-    return render_template('index.html')
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5555, debug=True)
-`
+main()

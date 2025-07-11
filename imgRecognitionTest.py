@@ -1,6 +1,8 @@
 from dronekit import connect, VehicleMode, LocationGlobal
 from pymavlink import mavutil
-import time, video, math
+import time, math
+import pi_imaging.videopi as video
+from picamera2 import Picamera2
 import numpy as np
 import cv2 as cv
 
@@ -74,6 +76,14 @@ def start_hover(vehicle):
         time.sleep(1)
     return
 
+def start_guided(vehicle):
+    vehicle.mode = VehicleMode("GUIDED")
+    vehicle.armed = False
+    while not vehicle.mode.name=='GUIDED' and vehicle.armed:
+        print("SETTING INTO GUIDED")
+        time.sleep(1)
+    return
+
 def land(vehicle):
     vehicle.mode = VehicleMode("LAND")
     vehicle.armed = False
@@ -94,25 +104,30 @@ start_hover(vehicle) #hover while it scans
 #! 3. gain input on any 'white' image on ground
 CENTER_THRESHOLD = 20 # pixels to center 
 
-vid = cv.VideoCapture(0)
+for i in range(12):
+    templates.append(cv.imread('images/' + str(i+1) + '.png', cv.IMREAD_GRAYSCALE))
+    templates[i] = cv.resize(templates[i], None, fx=0.5, fy=0.5, interpolation=cv.INTER_AREA)
+    templateSizes.append(templates[i].shape[::-1])
+    kp, desc = sift.detectAndCompute(templates[i], None)
+    siftKP.append(kp)
+    siftDesc.append(desc)
 
-if not vid.isOpened():
-    print("Failed to open camera.")
-    land(vehicle)
+WIDTH = 1280
+HEIGHT = 720
+vid = Picamera2()
+vid.configure(vid.create_video_configuration({"size": (WIDTH,HEIGHT), "format": "BGR888"}))
 
-centerX = vid.get(cv.CAP_PROP_FRAME_WIDTH)/2
-centerY = vid.get(cv.CAP_PROP_FRAME_HEIGHT)/2
+centerX = WIDTH/2
+centerY = HEIGHT/2
 
+vid.start()
 out = cv.VideoWriter('output.avi', cv.VideoWriter_fourcc(*'MJPG'), 60.0, (640, 480))
 
-dx = 0 #distance from center of img to center of screen
-dy = 0 #distance from center of img to center of screen
+dx = 0 
+dy = 0 
 
 while True:
-    ret, frame = vid.read()
-    
-    if not ret:
-        print("Failed to recieve frame.")
+    frame = vid.capture_array()
 
     #filter out green
     filtered = cv.cvtColor(frame, cv.COLOR_BGR2HSV)
@@ -137,15 +152,26 @@ while True:
         dy = centerY - targetY
         print(f"Target offset: dx={dx:.2f}, dy={dy:.2f}")
 
-        if abs(dx) > CENTER_THRESHOLD and abs(dy) > CENTER_THRESHOLD:
-            move_north = dy / 20
-            move_east = -dx / 20
-            new_loc = create_local_coordinate()
+        length = math.hypot(dx, dy)
+
+        if length > CENTER_THRESHOLD:
+            total_distance_ft = 3 # total distance it moves ft
+
+            # normalize vector and scale to 2 feet
+            move_north = (dy / length) * total_distance_ft
+            move_east = (-dx / length) * total_distance_ft
+
+            new_loc = create_local_coordinate(vehicle, move_north, move_east, 0)
+            start_guided(vehicle) #set guided to move
+            print(f"Moving to: N={move_north:.2f}ft, E={move_east:.2f}ft")
+            vehicle.simple_goto(new_loc, groundspeed=1.5)
+            time.sleep(3)
+            start_hover(vehicle) # set back
+
         else: 
             print("Target centered.")
-            print("")
+            print(f"GPS coordinate: lat:{vehicle.location.global_frame.lat}, lon:{vehicle.location.global_frame.lon}")
             break
-
 
     kp, desc = sift.detectAndCompute(filtered, None)
     if len(contours) != 0:
@@ -157,11 +183,11 @@ while True:
 
     out.write(frame)
     cv.imshow('stream', frame)
-    if cv.waitKey(1) == ord('q'):
-        break
+    # if cv.waitKey(1) == ord('q'):
+    #     break
 
 out.release()
-vid.release()
+vid.stop()
 cv.destroyAllWindows()
 
 vehicle.simple_goto(initial_pos)
