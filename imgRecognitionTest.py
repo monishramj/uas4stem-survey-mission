@@ -1,7 +1,7 @@
 from dronekit import connect, VehicleMode, LocationGlobal
 from pymavlink import mavutil
 import time, math
-import pi_imaging.videopi as video
+import video
 from picamera2 import Picamera2
 import numpy as np
 import cv2 as cv
