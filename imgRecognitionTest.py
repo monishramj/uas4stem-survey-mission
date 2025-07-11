@@ -1,6 +1,6 @@
-from dronekit import connect, VehicleMode
+from dronekit import connect, VehicleMode, LocationGlobal
 from pymavlink import mavutil
-import time, video
+import time, video, math
 import numpy as np
 import cv2 as cv
 
@@ -12,31 +12,29 @@ siftKP = []
 siftDesc = []
 
 # * TODO: create algorithm on coming to altitude and moving drone to center image
-# 4. TEST algorithm to determine distance of movement depending on distance from center of camera on screen
-# -- something haivng to do with calculating and translating vector?
-# 5. move drone to that specified local coordinate
-# 6. run TEST algorithm to double check center alignment of image
-# 7. repeat TEST movement until centered
-# 8. get gps coordinates
-# 9. run opencv to determine image type
-# 10. go back to initial gps and land
 
 # 2 m/s ()
-def send_ned_velocity(vehicle, north, east, altitude, duration):
-   msg = vehicle.message_factory.set_position_target_local_ned_encode(
-        0,       # time_boot_ms (not used)
-        0, 0,    # target system and component
-        mavutil.mavlink.MAV_FRAME_LOCAL_NED, # frame
-        0b0000111111000111, # type_mask (only velocities enabled)
-        north, east, altitude, # x, y, z velocity in m/s
-        # altitude is positive down
-        0, 0, 0, # x, y, z acceleration in m/s/s (not used)
-        0, 0, 0, # x, y, z position in m (not used)
-        0, 0)    # yaw and yaw_rate (not used)
-   
-   for x in range(0,duration):
-        vehicle.send_mavlink(msg)
-        time.sleep(1)
+
+def create_local_coordinate(vehicle, north, east, down): # function converts feet to new LocationGlobal 
+    start_pos = vehicle.location.global_frame
+    start_lat = start_pos.lat
+    start_lon = start_pos.lon
+    start_alt = start_pos.alt
+
+    north_m = north * .3048
+    east_m = east * .3048
+    down_m = down * .3048
+
+    R = 6378137.0
+
+    d_lat = north_m / R
+    d_lon = east_m / (R * math.cos(math.pi * start_lat / 180))
+
+    final_lat = start_lat + (d_lat * 180 / math.pi)
+    final_lon = start_lon + (d_lon * 180 / math.pi)
+    final_alt = start_alt - down_m
+
+    return LocationGlobal(final_lat, final_lon, final_alt)
 
 def arm_takeoff(altitude, vehicle): # in feet
     convertedAlt = altitude * 0.3048 # in meters
@@ -137,23 +135,35 @@ while True:
         cv.circle(frame, (targetX, targetY), 5, (0, 255, 0), -1)
         dx = centerX - targetX
         dy = centerY - targetY
-        print("Found center: (" + str(dx) + ", " + str(dy) + ")")
+        print(f"Target offset: dx={dx:.2f}, dy={dy:.2f}")
+
+        if abs(dx) > CENTER_THRESHOLD and abs(dy) > CENTER_THRESHOLD:
+            move_north = dy / 20
+            move_east = -dx / 20
+            new_loc = create_local_coordinate()
+        else: 
+            print("Target centered.")
+            print("")
+            break
+
 
     kp, desc = sift.detectAndCompute(filtered, None)
     if len(contours) != 0:
         detect = video.detectSIFT(filtered, contours[0])
     else:
         detect = False
-    if detect != False:
+    if detect:
         frame = cv.drawMatches(templates[detect[0]], siftKP[detect[0]], frame, kp, detect[1], None, flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
 
     out.write(frame)
     cv.imshow('stream', frame)
     if cv.waitKey(1) == ord('q'):
-        break;
+        break
 
 out.release()
 vid.release()
 cv.destroyAllWindows()
 
+vehicle.simple_goto(initial_pos)
+land(vehicle)
 
