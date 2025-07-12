@@ -183,7 +183,8 @@ out = cv.VideoWriter('output.avi', cv.VideoWriter_fourcc(*'MJPG'), 60.0, (640, 4
 dx = 0 
 dy = 0 
 
-while True and not drone.mode.name=='RTL':
+run = True
+while run and not drone.mode.name=='RTL':
     frame = vid.capture_array()
 
     #filter out green
@@ -220,12 +221,11 @@ while True and not drone.mode.name=='RTL':
             move_east = step_length * math.cos(global_angle)
 
             new_loc = create_local_coordinate(drone, move_north, move_east, 0)
+
             start_guided(drone) #set guided to move
             print(f"Moving to: N={move_north:.2f}ft, E={move_east:.2f}ft")
             drone.simple_goto(new_loc, groundspeed=1.5)
-            time.sleep(3)
-            start_hover(drone) # set back
-
+            time.sleep(5)
         else: 
             print("Target centered.")
             print(f"GPS coordinate: lat:{drone.location.global_frame.lat}, lon:{drone.location.global_frame.lon}")
@@ -242,7 +242,9 @@ while True and not drone.mode.name=='RTL':
     out.write(frame)
     cv.imshow('stream', frame)
     if cv.waitKey(1) == ord('q'):
-         break
+        print("Q pressed, exit.")
+        run = False
+        
 
 out.release()
 vid.stop()
