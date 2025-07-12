@@ -183,7 +183,7 @@ out = cv.VideoWriter('output.avi', cv.VideoWriter_fourcc(*'MJPG'), 60.0, (640, 4
 dx = 0 
 dy = 0 
 
-while True:
+while True and not drone.mode.name=='RTL':
     frame = vid.capture_array()
 
     #filter out green
@@ -209,14 +209,16 @@ while True:
         dy = centerY - targetY
         print(f"Target offset: dx={dx:.2f}, dy={dy:.2f}")
 
-        length = math.hypot(dx, dy)
-
-        if length > CENTER_THRESHOLD:
-            total_distance_ft = 3 # total distance it moves ft
+        dist_from_center = math.hypot(dx, dy)
+        if dist_from_center > CENTER_THRESHOLD:
+            step_length = 3 # total distance it steps toward target, ft
             
-            # normalize vector and scale to 2 feet
-            move_north = (-dy / length) * total_distance_ft # fix this
-            move_east = (-dx / length) * total_distance_ft
+            screen_angle = math.degrees(math.atan2(dy, dx))
+            global_angle = math.radians(screen_angle + drone.heading) # heading is calc. yaw, 0 is N, goes E i believe
+
+            move_north = step_length * math.sin(global_angle)
+            move_east = step_length * math.cos(global_angle)
+
             new_loc = create_local_coordinate(drone, move_north, move_east, 0)
             start_guided(drone) #set guided to move
             print(f"Moving to: N={move_north:.2f}ft, E={move_east:.2f}ft")
