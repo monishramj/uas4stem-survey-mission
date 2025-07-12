@@ -1,22 +1,75 @@
 from dronekit import connect, VehicleMode, LocationGlobal
 from pymavlink import mavutil
 import time, math
-import video
-from picamera2 import Picamera2
+from picamera2 import Picamera2 
 import numpy as np
 import cv2 as cv
-
-sift = cv.xfeatures2d.SIFT_create()
-bf = cv.BFMatcher()
-templates = []
-templateSizes = []
-siftKP = []
-siftDesc = []
-
 # * TODO: create algorithm on coming to altitude and moving drone to center image
 
 # 2 m/s ()
+def detectSIFT(frame, contour):
+    kp, desc = sift.detectAndCompute(frame, None) # https://amroamroamro.github.io/mexopencv/matlab/cv.SIFT.detectAndCompute.html
+    best = 0
+    bestID = -1
+    bestMatches = False
+    for i in range(12):
+        if i == 6:
+            ratio = 0.6
+        else:
+            ratio = 0.5
+        matches = bf.knnMatch(siftDesc[i], desc, k=2) # https://docs.opencv.org/3.4/dc/dc3/tutorial_py_matcher.html
+        validMatches = []
+        if len(matches) != 0 and len(matches[0]) == 2:
+            avr = 0
+            for m, n in matches:
+                if min(m.distance / n.distance, n.distance / m.distance) < ratio:
+                #if min(m.distance / n.distance, n.distance / m.distance) < ratio and cv.pointPolygonTest(contour, kp[n.queryIdx].pt, True) <= 0:
+                    validMatches.append(m)
+                    avr += m.distance / n.distance
+            if len(validMatches) != 0:
+                avr /= len(validMatches)
+            else:
+                continue
+            avr = len(validMatches) / len(matches)
+        if avr > best:
+            best = avr
+            bestID = i
+            bestMatches = validMatches
+    if best != 0:
+        return [bestID, bestMatches]
+    else:
+        return bestMatches
+def findPOI(frame):
+    ret, thresh = cv.threshold(frame, 200, 255, cv.THRESH_BINARY)
+    contours, hierarchy = cv.findContours(thresh, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
+    validContours = []
+    for i in range(len(contours)):
+        contour = contours[i]
 
+        #check area
+        if cv.contourArea(contour) < 150:
+            continue
+
+        #check solidity
+        hull = cv.convexHull(contour)
+        if cv.contourArea(hull) == 0:
+            continue
+        solidity = abs(cv.contourArea(contour) / cv.contourArea(hull))
+        if abs(solidity - 1) > 0.1:
+            continue
+
+        #check approx
+        epsilon = 0.02 * cv.arcLength(contour, True)
+        approx = cv.approxPolyDP(contour, epsilon, True)
+        if len(approx) != 4:
+            continue
+
+        if hierarchy[0][i][3] != -1:
+            continue
+
+        validContours.append(contour)
+    validContours.sort(key=lambda contour: -cv.contourArea(contour))
+    return validContours
 def create_local_coordinate(vehicle, north, east, down): # function converts feet to new LocationGlobal 
     start_pos = vehicle.location.global_frame
     start_lat = start_pos.lat
@@ -37,7 +90,6 @@ def create_local_coordinate(vehicle, north, east, down): # function converts fee
     final_alt = start_alt - down_m
 
     return LocationGlobal(final_lat, final_lon, final_alt)
-
 def arm_takeoff(altitude, vehicle): # in feet
     convertedAlt = altitude * 0.3048 # in meters
 
@@ -67,7 +119,6 @@ def arm_takeoff(altitude, vehicle): # in feet
         time.sleep(1)
     
     return
-
 def start_hover(vehicle):
     vehicle.mode = VehicleMode("BRAKE")
     vehicle.armed = False
@@ -75,7 +126,6 @@ def start_hover(vehicle):
         print("BRAKING")
         time.sleep(1)
     return
-
 def start_guided(vehicle):
     vehicle.mode = VehicleMode("GUIDED")
     vehicle.armed = False
@@ -83,7 +133,6 @@ def start_guided(vehicle):
         print("SETTING INTO GUIDED")
         time.sleep(1)
     return
-
 def land(vehicle):
     vehicle.mode = VehicleMode("LAND")
     vehicle.armed = False
@@ -93,16 +142,23 @@ def land(vehicle):
 
 #! 1. connect x
 print("trying to connect")
-vehicle = connect(ip='/dev/ttyAMA0', wait_ready=True, baud=115200)  
+drone = connect(ip='/dev/ttyAMA0', wait_ready=True, baud=115200)  
 
 #! 2. launch and save initial gps x
-arm_takeoff(30, vehicle)
-initial_pos = vehicle.location.global_frame
+arm_takeoff(30, drone)
+initial_pos = drone.location.global_frame
 
-start_hover(vehicle) #hover while it scans
+start_hover(drone) #hover while it scans
 
 #! 3. gain input on any 'white' image on ground
 CENTER_THRESHOLD = 20 # pixels to center 
+
+sift = cv.xfeatures2d.SIFT_create()
+bf = cv.BFMatcher()
+templates = []
+templateSizes = []
+siftKP = []
+siftDesc = []
 
 for i in range(12):
     templates.append(cv.imread('images/' + str(i+1) + '.png', cv.IMREAD_GRAYSCALE))
@@ -114,6 +170,7 @@ for i in range(12):
 
 WIDTH = 1280
 HEIGHT = 720
+
 vid = Picamera2()
 vid.configure(vid.create_video_configuration({"size": (WIDTH,HEIGHT), "format": "BGR888"}))
 
@@ -140,7 +197,7 @@ while True:
     filtered = cv.cvtColor(filtered, cv.COLOR_HSV2BGR)
     filtered = cv.cvtColor(filtered, cv.COLOR_BGR2GRAY)
 
-    contours = video.findPOI(filtered)
+    contours = findPOI(filtered)
     frame = cv.drawContours(frame, contours, -1, (0, 255, 0), 2)
 
     if len(contours) != 0:
@@ -156,26 +213,25 @@ while True:
 
         if length > CENTER_THRESHOLD:
             total_distance_ft = 3 # total distance it moves ft
-
+            
             # normalize vector and scale to 2 feet
-            move_north = (dy / length) * total_distance_ft
+            move_north = (-dy / length) * total_distance_ft # fix this
             move_east = (-dx / length) * total_distance_ft
-
-            new_loc = create_local_coordinate(vehicle, move_north, move_east, 0)
-            start_guided(vehicle) #set guided to move
+            new_loc = create_local_coordinate(drone, move_north, move_east, 0)
+            start_guided(drone) #set guided to move
             print(f"Moving to: N={move_north:.2f}ft, E={move_east:.2f}ft")
-            vehicle.simple_goto(new_loc, groundspeed=1.5)
+            drone.simple_goto(new_loc, groundspeed=1.5)
             time.sleep(3)
-            start_hover(vehicle) # set back
+            start_hover(drone) # set back
 
         else: 
             print("Target centered.")
-            print(f"GPS coordinate: lat:{vehicle.location.global_frame.lat}, lon:{vehicle.location.global_frame.lon}")
+            print(f"GPS coordinate: lat:{drone.location.global_frame.lat}, lon:{drone.location.global_frame.lon}")
             break
 
     kp, desc = sift.detectAndCompute(filtered, None)
     if len(contours) != 0:
-        detect = video.detectSIFT(filtered, contours[0])
+        detect = detectSIFT(filtered, contours[0])
     else:
         detect = False
     if detect:
@@ -183,13 +239,13 @@ while True:
 
     out.write(frame)
     cv.imshow('stream', frame)
-    # if cv.waitKey(1) == ord('q'):
-    #     break
+    if cv.waitKey(1) == ord('q'):
+         break
 
 out.release()
 vid.stop()
 cv.destroyAllWindows()
 
-vehicle.simple_goto(initial_pos)
-land(vehicle)
+drone.simple_goto(initial_pos)
+land(drone)
 

@@ -1,6 +1,6 @@
 from dronekit import connect, VehicleMode, LocationGlobal
 from pymavlink import mavutil
-import time, math, video
+import time, math, imaging.video as video
 import numpy as np
 import cv2 as cv
 
