@@ -1,5 +1,4 @@
-from dronekit import connect, VehicleMode, LocationGlobal
-from pymavlink import mavutil
+from dronekit import connect, VehicleMode, LocationGlobal, mavutil
 import time, math
 from picamera2 import Picamera2 
 import numpy as np
@@ -117,7 +116,7 @@ def arm_takeoff(altitude, vehicle): # in feet
             print(f"Reached target altitude.")
             break
         time.sleep(1)
-    
+
     return
 def start_hover(vehicle):
     vehicle.mode = VehicleMode("BRAKE")
@@ -172,19 +171,29 @@ WIDTH = 1280
 HEIGHT = 720
 
 vid = Picamera2()
+vid.video_configuration.controls.FrameRate = 20.0
 vid.configure(vid.create_video_configuration({"size": (WIDTH,HEIGHT), "format": "BGR888"}))
 
 centerX = WIDTH/2
 centerY = HEIGHT/2
 
 vid.start()
-out = cv.VideoWriter('output.avi', cv.VideoWriter_fourcc(*'MJPG'), 60.0, (640, 480))
+out = cv.VideoWriter('output.avi', cv.VideoWriter_fourcc(*'MJPG'), 20.0, (WIDTH,HEIGHT))
+print("Video start")
+dx = 0
+dy = 0
 
-dx = 0 
-dy = 0 
+vid.set_controls({
+    "ExposureTime": 2000,
+    "AnalogueGain": 1.1,
+    "Saturation": 0.0,
+    "Contrast": 1.1,
+})
 
 run = True
+print("Search initiated")
 while run and not drone.mode.name=='RTL':
+#while run:
     frame = vid.capture_array()
 
     #filter out green
@@ -202,31 +211,33 @@ while run and not drone.mode.name=='RTL':
     frame = cv.drawContours(frame, contours, -1, (0, 255, 0), 2)
 
     if len(contours) != 0:
+        print("Target found.")
         M = cv.moments(contours[0])
         targetX = int(M["m10"] / M["m00"])
         targetY = int(M["m01"] / M["m00"])
         cv.circle(frame, (targetX, targetY), 5, (0, 255, 0), -1)
-        dx = centerX - targetX
+        dx = -1 * (centerX - targetX)
         dy = centerY - targetY
         print(f"Target offset: dx={dx:.2f}, dy={dy:.2f}")
 
         dist_from_center = math.hypot(dx, dy)
         if dist_from_center > CENTER_THRESHOLD:
-            step_length = 3 # total distance it steps toward target, ft
-            
-            screen_angle = math.degrees(math.atan2(dy, dx))
-            global_angle = math.radians(screen_angle + drone.heading) # heading is calc. yaw, 0 is N, goes E i believe
+            print("Trying to move")
+            step_length = 2 # total distance it steps toward target, ft
+            screen_angle = math.degrees(math.atan2(dy, dx))-90
+            global_angle = math.radians(-1 * screen_angle + drone.heading) # heading is calc. yaw, 0 is N, goes E i believe
 
-            move_north = step_length * math.sin(global_angle)
-            move_east = step_length * math.cos(global_angle)
+            move_north = step_length * math.cos(global_angle)
+            move_east = step_length * math.sin(global_angle)
 
             new_loc = create_local_coordinate(drone, move_north, move_east, 0)
 
             start_guided(drone) #set guided to move
             print(f"Moving to: N={move_north:.2f}ft, E={move_east:.2f}ft")
             drone.simple_goto(new_loc, groundspeed=1.5)
-            time.sleep(5)
-        else: 
+            time.sleep(5.0)
+            start_hover(drone)
+        else:
             print("Target centered.")
             print(f"GPS coordinate: lat:{drone.location.global_frame.lat}, lon:{drone.location.global_frame.lon}")
             break
@@ -240,16 +251,14 @@ while run and not drone.mode.name=='RTL':
         frame = cv.drawMatches(templates[detect[0]], siftKP[detect[0]], frame, kp, detect[1], None, flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
 
     out.write(frame)
-    cv.imshow('stream', frame)
+    #cv.imshow('stream', frame)
     if cv.waitKey(1) == ord('q'):
         print("Q pressed, exit.")
         run = False
-        
 
 out.release()
 vid.stop()
 cv.destroyAllWindows()
-
+print("Mission end. Land.")
 drone.simple_goto(initial_pos)
 land(drone)
-
