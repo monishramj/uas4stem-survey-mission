@@ -5,7 +5,7 @@ import numpy as np
 import cv2 as cv
 # * TODO: create algorithm on coming to altitude and moving drone to center image
 
-# 2 m/s ()
+# HELPER FUNCTIONS
 def detectSIFT(frame, contour):
     kp, desc = sift.detectAndCompute(frame, None) # https://amroamroamro.github.io/mexopencv/matlab/cv.SIFT.detectAndCompute.html
     best = 0
@@ -240,7 +240,7 @@ while run and not drone.mode.name=='RTL':
             start_guided(drone) #set guided to move
             print(f"Moving to: N={move_north:.2f}ft, E={move_east:.2f}ft")
             drone.simple_goto(new_loc, groundspeed=1.5)
-            moving_until = time.time() + MOVE_TIME
+            moving = time.time() + MOVE_TIME
         else:
             print("Target centered.")
             print(f"GPS coordinate: lat:{drone.location.global_frame.lat}, lon:{drone.location.global_frame.lon}")
