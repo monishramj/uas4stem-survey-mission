@@ -4,6 +4,7 @@ from picamera2 import Picamera2
 import numpy as np
 import cv2 as cv
 # * TODO: competition algorithm that uses imageRecognition algorithm within a multi-POI auto-mission setup
+# * should move to position drone onto img
 
 # -- HELPER FUNCTIONS
 def detectSIFT(frame, contour):
@@ -92,7 +93,6 @@ def create_local_coordinate(vehicle, north, east, down): # function converts fee
 def arm_takeoff(altitude, vehicle): # in feet
     convertedAlt = altitude * 0.3048 # in meters
 
-    #! 2. launch and save initial gps x
     while not vehicle.is_armable:
         print("Waiting to initialise...")
         time.sleep(1)
@@ -184,21 +184,26 @@ vid.set_controls({
 })
 print("Control effects set")
 
-#! 5.------ IMAGING ------
+#! 5.------ SEARCH SETUP ------
 found_targets = []  # store detected target IDs
 dx, dy = 0, 0
 
-CENTER_THRESHOLD = 100  # pixels
-MOVE_TIME = 5 # in seconds
-STEP_LENGTH = 2  # feet
+CENTER_THRESHOLD = 100  # pixel amt to be centered
+MOVE_TIME = 5 # sec, how long drone has to move
+STEP_LENGTH = 2  # ft, how far mvm is when detected
+STEP_SPEED = 1.5 # m/s, GROUND speed for mvm to coordinate
 print("Search initated")
 
 moving = None
+original_location = None
 
+#! 6.------ SEARCH ------
 # attempt @ FSM
 try:
     while True:
+        #! EACH FRAME, WRITES CAPTURE AND GREEN FILTER
         frame = vid.capture_array()
+
         # filter green
         filtered = cv.cvtColor(frame, cv.COLOR_BGR2HSV)
         lowerGreen = np.array([40, 255, 255])
@@ -210,68 +215,88 @@ try:
         filtered = cv.cvtColor(filtered, cv.COLOR_HSV2BGR)
         filtered = cv.cvtColor(filtered, cv.COLOR_BGR2GRAY)
 
+        #! EACH FRAME, CHECKS FOR POIS
+        contours = findPOI(filtered)
+        frame = cv.drawContours(frame, contours, -1, (0, 255, 0), 2)
+
         # If RTL engaged, break
         if drone.mode.name == 'RTL':
             print("RTL detected, mission END")
             break
             
-        if drone.mode.name == 'GUIDED': #incomplete
+        #! ONLY WHEN MOVING TO POI
+        if drone.mode.name == 'GUIDED': 
             if moving is not None: 
                 if time.time() >= moving:
+                    print("Finishing positioning, back to AUTO!")
                     set_mode(drone, "AUTO")
                     moving = None
+                    original_location = None
 
-        # If still in AUTO, check camera
+        #! AUTO SURVEY WHILE WAYPOINT TAKES CONTROL
         if drone.mode.name == 'AUTO':
-            contours = findPOI(filtered)
-            frame = cv.drawContours(frame, contours, -1, (0, 255, 0), 2)
+            if contours and moving is None:
+                print("Possible target")
+                detect = detectSIFT(filtered, contours[0])
+                if detect:
+                    frame = cv.drawMatches(templates[detect[0]], siftKP[detect[0]], frame, kp, detect[1], None, flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+                    target_id, matches = detect
+                    if target_id in found_targets:
+                        print(f"Already found target {target_id}, ignore ts")
+                        continue
+                    print(f"New target {target_id} found")
 
-            if len(contours) != 0 and moving is None:
-                print("Target found.")
-                set_mode(drone, 'HOVER')
+                    original_location = drone.location.global_frame
+                    set_mode(drone, 'HOVER')
 
-                M = cv.moments(contours[0])
-                targetX = int(M["m10"] / M["m00"])
-                targetY = int(M["m01"] / M["m00"])
-                cv.circle(frame, (targetX, targetY), 5, (0, 255, 0), -1)
-                dx = -(centerX - targetX)
-                dy = centerY - targetY
-                print(f"Target offset: dx={dx:.2f}, dy={dy:.2f}")
+                    # center offsets
+                    M = cv.moments(contours[0])
+                    targetX = int(M["m10"] / M["m00"])
+                    targetY = int(M["m01"] / M["m00"])
+                    cv.circle(frame, (targetX, targetY), 5, (0, 255, 0), -1)
+                    dx = -(centerX - targetX)
+                    dy = centerY - targetY
+                    dist_from_center = math.hypot(dx, dy)
 
-                dist_from_center = math.hypot(dx, dy)
-                if dist_from_center > CENTER_THRESHOLD:
-                    print("Trying to move")
-                    
-                    screen_angle = math.degrees(math.atan2(dy, dx))-90
-                    global_angle = math.radians(-1 * screen_angle + drone.heading) # heading is calc. yaw, 0 is N, goes E i believe
+                    print(f"Target offset: dx={dx:.2f}, dy={dy:.2f}, dist={dist_from_center:.2f}")
 
-                    move_north = STEP_LENGTH * math.cos(global_angle)
-                    move_east = STEP_LENGTH * math.sin(global_angle)
+                    if dist_from_center > CENTER_THRESHOLD:
+                        print("Try move over target")
+                        set_mode(drone, "GUIDED") #set guided to move
 
-                    new_loc = create_local_coordinate(drone, move_north, move_east, 0)
+                        screen_angle = math.degrees(math.atan2(dy, dx))-90
+                        global_angle = math.radians(-1 * screen_angle + drone.heading) # heading is calc. yaw, 0 is N, goes E i believe
 
-                    set_mode(drone, "GUIDED") #set guided to move
-                    print(f"Moving to: N={move_north:.2f}ft, E={move_east:.2f}ft")
-                    drone.simple_goto(new_loc, groundspeed=1.5)
-                    moving = time.time() + MOVE_TIME
+                        move_north = STEP_LENGTH * math.cos(global_angle)
+                        move_east = STEP_LENGTH * math.sin(global_angle)
+
+                        new_loc = create_local_coordinate(drone, move_north, move_east, 0)
+                        print(f"Moving to: N={move_north:.2f}ft, E={move_east:.2f}ft")
+
+                        drone.simple_goto(new_loc, groundspeed=STEP_SPEED)
+                        moving = time.time() + MOVE_TIME
                 else:
-                    print("Target centered.")
+                    print(f"Target {target_id} centered.")
                     print(f"GPS coordinate: lat:{drone.location.global_frame.lat}, lon:{drone.location.global_frame.lon}")
 
-            kp, desc = sift.detectAndCompute(filtered, None)
-            if len(contours) != 0:
-                detect = detectSIFT(filtered, contours[0])
-            else:
-                detect = False
-            if detect:
-                frame = cv.drawMatches(templates[detect[0]], siftKP[detect[0]], frame, kp, detect[1], None, flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
-        out.write(frame)
-except KeyboardInterrupt:
-    print("Mission interrupted manually.")
+                    found_targets.append(target_id)
 
-finally:
-    out.release()
-    vid.stop()
-    cv.destroyAllWindows()
-    print("Landing...")
-    land(drone)
+            # potentilaly deprecated code...
+            # kp, desc = sift.detectAndCompute(filtered, None)
+            # if len(contours) != 0:
+            #     detect = detectSIFT(filtered, contours[0])
+            # else:
+            #     detect = False
+            # if detect:
+            #     frame = cv.drawMatches(templates[detect[0]], siftKP[detect[0]], frame, kp, detect[1], None, flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+        out.write(frame) # write out frame w/ debug lines
+    
+    print("Mission complete")
+except KeyboardInterrupt:
+    print("Mission interrupted manually")
+
+print("Preparing to return and land")
+set_mode(drone, "RTL")
+drone.disarm(wait=True)
+print("We done WOOOHOO")
+
