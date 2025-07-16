@@ -297,6 +297,5 @@ except KeyboardInterrupt:
 
 print("Preparing to return and land")
 set_mode(drone, "RTL")
-drone.disarm(wait=True)
 print("We done WOOOHOO")
 
