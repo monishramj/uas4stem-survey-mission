@@ -2,3 +2,5 @@
 venv/
 mavlink/
 .DS_STORE
+theoreticalImageRecog.py
+
