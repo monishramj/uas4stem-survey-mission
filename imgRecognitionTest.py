@@ -150,7 +150,6 @@ initial_pos = drone.location.global_frame
 start_hover(drone) #hover while it scans
 
 #! 3. gain input on any 'white' image on ground
-CENTER_THRESHOLD = 20 # pixels to center 
 
 sift = cv.xfeatures2d.SIFT_create()
 bf = cv.BFMatcher()
@@ -191,9 +190,15 @@ vid.set_controls({
 })
 
 run = True
+
 print("Search initiated")
+moving = None
+
+CENTER_THRESHOLD = 100 # pixels to center 
+MOVE_TIME = 5 # in seconds
+STEP_LENGTH = 2 # in ft
+
 while run and not drone.mode.name=='RTL':
-#while run:
     frame = vid.capture_array()
 
     #filter out green
@@ -210,37 +215,41 @@ while run and not drone.mode.name=='RTL':
     contours = findPOI(filtered)
     frame = cv.drawContours(frame, contours, -1, (0, 255, 0), 2)
 
-    if len(contours) != 0:
+    if len(contours) != 0 and moving is None:
         print("Target found.")
         M = cv.moments(contours[0])
         targetX = int(M["m10"] / M["m00"])
         targetY = int(M["m01"] / M["m00"])
         cv.circle(frame, (targetX, targetY), 5, (0, 255, 0), -1)
-        dx = -1 * (centerX - targetX)
+        dx = -(centerX - targetX)
         dy = centerY - targetY
         print(f"Target offset: dx={dx:.2f}, dy={dy:.2f}")
 
         dist_from_center = math.hypot(dx, dy)
         if dist_from_center > CENTER_THRESHOLD:
             print("Trying to move")
-            step_length = 2 # total distance it steps toward target, ft
+            
             screen_angle = math.degrees(math.atan2(dy, dx))-90
             global_angle = math.radians(-1 * screen_angle + drone.heading) # heading is calc. yaw, 0 is N, goes E i believe
 
-            move_north = step_length * math.cos(global_angle)
-            move_east = step_length * math.sin(global_angle)
+            move_north = STEP_LENGTH * math.cos(global_angle)
+            move_east = STEP_LENGTH * math.sin(global_angle)
 
             new_loc = create_local_coordinate(drone, move_north, move_east, 0)
 
             start_guided(drone) #set guided to move
             print(f"Moving to: N={move_north:.2f}ft, E={move_east:.2f}ft")
             drone.simple_goto(new_loc, groundspeed=1.5)
-            time.sleep(5.0)
-            start_hover(drone)
+            moving_until = time.time() + MOVE_TIME
         else:
             print("Target centered.")
             print(f"GPS coordinate: lat:{drone.location.global_frame.lat}, lon:{drone.location.global_frame.lon}")
-            break
+            run = False
+    elif moving is not None: # should go thru this if still 'moving'
+        # no actual check for mvm, just timer
+        if time.time() >= moving:
+            start_hover(drone)
+            moving = None
 
     kp, desc = sift.detectAndCompute(filtered, None)
     if len(contours) != 0:
@@ -259,6 +268,7 @@ while run and not drone.mode.name=='RTL':
 out.release()
 vid.stop()
 cv.destroyAllWindows()
+
 print("Mission end. Land.")
 drone.simple_goto(initial_pos)
 land(drone)
