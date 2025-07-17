@@ -1,5 +1,6 @@
 from dronekit import connect, VehicleMode, LocationGlobal, mavutil
 import time, math, traceback
+from datetime import datetime
 from picamera2 import Picamera2 
 import numpy as np
 import cv2 as cv
@@ -135,7 +136,9 @@ def land(vehicle):
         print("LANDING")
         time.sleep(1)
 
-#! 1.----- CONNECT THE DRONE -----
+#! 1.----- CONNECT THE DRRONE ----
+current_date_and_time = datetime.now()
+print("The current date and time of flight is", current_date_and_time)
 print("Trying to connect...")
 drone = connect(ip='/dev/ttyAMA0', wait_ready=True, baud=115200) 
 print("Connected BOOYAH!") 
