@@ -1,5 +1,5 @@
 from dronekit import connect, VehicleMode, LocationGlobal, mavutil
-import time, math
+import time, math, traceback
 from picamera2 import Picamera2 
 import numpy as np
 import cv2 as cv
@@ -135,7 +135,7 @@ def land(vehicle):
         print("LANDING")
         time.sleep(1)
 
-#! 1.----- CONNECT THE DRRONE ----
+#! 1.----- CONNECT THE DRONE -----
 print("Trying to connect...")
 drone = connect(ip='/dev/ttyAMA0', wait_ready=True, baud=115200) 
 print("Connected BOOYAH!") 
@@ -236,6 +236,7 @@ try:
         #! AUTO SURVEY WHILE WAYPOINT TAKES CONTROL
         if drone.mode.name == 'AUTO':
             if len(contours) != 0 and moving is None:
+                set_mode(drone, 'BRAKE')
                 print("Possible target")
                 kp, desc = sift.detectAndCompute(filtered, None)
                 detect = detectSIFT(filtered, contours[0])
@@ -250,8 +251,6 @@ try:
                     print(f"New target {target_id} found")
 
                     original_location = drone.location.global_frame
-                    set_mode(drone, 'HOVER')
-
                     # center offsets
                     M = cv.moments(contours[0])
                     targetX = int(M["m10"] / M["m00"])
@@ -278,11 +277,11 @@ try:
 
                         drone.simple_goto(new_loc, groundspeed=STEP_SPEED)
                         moving = time.time() + MOVE_TIME
-                else:
-                    print(f"Target {target_id} centered.")
-                    print(f"GPS coordinate: lat:{drone.location.global_frame.lat}, lon:{drone.location.global_frame.lon}")
+                    else:
+                        print(f"Target {target_id} centered.")
+                        print(f"GPS coordinate: lat:{drone.location.global_frame.lat}, lon:{drone.location.global_frame.lon}")
 
-                    found_targets.append(target_id)
+                        found_targets.append(target_id)
 
             # potentilaly deprecated code...
             # kp, desc = sift.detectAndCompute(filtered, None)
@@ -297,6 +296,11 @@ try:
     print("Mission complete")
 except KeyboardInterrupt:
     print("Mission interrupted manually")
+except Exception as e:
+    print(f"ERROR. Mission interrupted by: {type(e).__name__} - {e}.")
+    tb = traceback.format_exc()
+    print(tb)  # Or write to a log file
+
 
 print("Preparing to return and land")
 set_mode(drone, "RTL")
