@@ -235,12 +235,15 @@ try:
 
         #! AUTO SURVEY WHILE WAYPOINT TAKES CONTROL
         if drone.mode.name == 'AUTO':
-            if contours and moving is None:
+            if len(contours) != 0 and moving is None:
                 print("Possible target")
+                kp, desc = sift.detectAndCompute(filtered, None)
                 detect = detectSIFT(filtered, contours[0])
-                if detect:
-                    frame = cv.drawMatches(templates[detect[0]], siftKP[detect[0]], frame, kp, detect[1], None, flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
-                    target_id, matches = detect
+                if detect != False:
+                    target_id = detect[0]
+                    matches = detect[1]
+                    frame = cv.drawMatches(templates[target_id], siftKP[target_id], frame, kp, matches, None, flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+                    # target_id, matches = detect
                     if target_id in found_targets:
                         print(f"Already found target {target_id}, ignore ts")
                         continue
