@@ -1,11 +1,27 @@
 from dronekit import connect, VehicleMode, LocationGlobal, mavutil
 import time, math, traceback
+from enum import Enum
 from datetime import datetime
 from picamera2 import Picamera2 
 import numpy as np
 import cv2 as cv
 # * TODO: competition algorithm that uses imageRecognition algorithm within a multi-POI auto-mission setup
 # * should move to position drone onto img
+
+# -- ENUM FOR TARGET IDS
+class Targets(Enum):
+    WIFI_TOWER = 0
+    TREES = 1
+    ROCKS = 2
+    WOOD_PLANKS = 3
+    STACK_OF_LOGS = 4
+    ELECTRIC_TOWER = 5
+    CROSSROADS = 6
+    TRASH_CAN = 7
+    WARNING_SIGN = 8
+    BRIDGE = 9
+    SCREWS = 10
+    BULLDOZER = 11
 
 # -- HELPER FUNCTIONS
 def detectSIFT(frame, contour):
@@ -136,7 +152,7 @@ def land(vehicle):
         print("LANDING")
         time.sleep(1)
 
-#! 1.----- CONNECT THE DRRONE ----
+#! 1.----- CONNECT THE DRONE -----
 current_date_and_time = datetime.now()
 print("The current date and time of flight is", current_date_and_time)
 print("Trying to connect...")
@@ -192,13 +208,14 @@ found_targets = []  # store detected target IDs
 dx, dy = 0, 0
 
 CENTER_THRESHOLD = 100  # pixel amt to be centered
-MOVE_TIME = 5 # sec, how long drone has to move
+MOVE_TIME = 3 # sec, how long drone has to move
 STEP_LENGTH = 2  # ft, how far mvm is when detected
 STEP_SPEED = 1.5 # m/s, GROUND speed for mvm to coordinate
+TARGET_COOLDOWN = 5 # sec, how long drone has before checking for POIs again
 print("Search initated")
 
 moving = None
-original_location = None
+scan_cd = None # target cooldown to not keep scanning same thing
 
 #! 6.------ SEARCH ------
 # attempt @ FSM
@@ -234,11 +251,15 @@ try:
                     print("Finishing positioning, back to AUTO!")
                     set_mode(drone, "AUTO")
                     moving = None
-                    original_location = None
 
         #! AUTO SURVEY WHILE WAYPOINT TAKES CONTROL
         if drone.mode.name == 'AUTO':
             if len(contours) != 0 and moving is None:
+                if scan_cd is not None:
+                    if time.time() >= scan_cd:
+                        scan_cd = None
+                    else:
+                        continue
                 set_mode(drone, 'BRAKE')
                 print("Possible target")
                 kp, desc = sift.detectAndCompute(filtered, None)
@@ -247,13 +268,12 @@ try:
                     target_id = detect[0]
                     matches = detect[1]
                     frame = cv.drawMatches(templates[target_id], siftKP[target_id], frame, kp, matches, None, flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
-                    # target_id, matches = detect
+                    target_name = Targets(target_id).name
                     if target_id in found_targets:
-                        print(f"Already found target {target_id}, ignore ts")
+                        print(f"Already found target  {target_id}: {target_name}, ignore ts")
                         continue
-                    print(f"New target {target_id} found")
+                    print(f"New target {target_id}: {target_name} found")
 
-                    original_location = drone.location.global_frame
                     # center offsets
                     M = cv.moments(contours[0])
                     targetX = int(M["m10"] / M["m00"])
@@ -285,6 +305,7 @@ try:
                         print(f"GPS coordinate: lat:{drone.location.global_frame.lat}, lon:{drone.location.global_frame.lon}")
 
                         found_targets.append(target_id)
+                        scan_cd = time.time() + TARGET_COOLDOWN
 
             # potentilaly deprecated code...
             # kp, desc = sift.detectAndCompute(filtered, None)
