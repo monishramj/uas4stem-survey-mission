@@ -10,18 +10,18 @@ import cv2 as cv
 
 # -- ENUM FOR TARGET IDS
 class Targets(Enum):
-    WIFI_TOWER = 0
-    TREES = 1
-    ROCKS = 2
-    WOOD_PLANKS = 3
-    STACK_OF_LOGS = 4
-    ELECTRIC_TOWER = 5
-    CROSSROADS = 6
-    TRASH_CAN = 7
-    WARNING_SIGN = 8
+    TOWER = 0
+    TREE = 1
+    RUBBLE = 2
+    LUMBER = 3
+    PIPES = 4
+    POWER_LINES = 5
+    INTERSECTION = 6
+    TRASH = 7
+    PERSONNEL = 8
     BRIDGE = 9
-    SCREWS = 10
-    BULLDOZER = 11
+    HARDWARE = 10
+    EQUIPMENT = 11
 
 # -- HELPER FUNCTIONS
 def detectSIFT(frame, contour):
@@ -107,6 +107,34 @@ def create_local_coordinate(vehicle, north, east, down): # function converts fee
     final_alt = start_alt - down_m
 
     return LocationGlobal(final_lat, final_lon, final_alt)
+def calculate_target_gps(drone, dx_dist, dy_dist): # function takes in dx dy feet and gives new GPS coordinates
+    screen_angle = math.degrees(math.atan2(dy, dx))
+    global_angle_deg = -screen_angle + 90 + drone.heading
+    global_angle_rad = math.radians(global_angle_deg)
+
+    total_dist_ft = math.sqrt(dx_dist**2 + dy_dist**2)
+    
+    north_ft = total_dist_ft * math.cos(global_angle_rad)
+    east_ft = total_dist_ft * math.sin(global_angle_rad)
+
+    north_m = north_ft * 0.3048
+    east_m = east_ft * 0.3048
+
+    R = 6378137.0
+
+    drone_lat = drone.location.global_frame.lat
+    drone_lon = drone.location.global_frame.lon
+    
+    d_lat = north_m / R
+    d_lat_deg = d_lat * 180 / math.pi
+    
+    d_lon = east_m / (R * math.cos(math.pi * drone_lat / 180))
+    d_lon_deg = d_lon * 180 / math.pi
+    
+    target_lat = drone_lat + d_lat_deg
+    target_lon = drone_lon + d_lon_deg
+    
+    return target_lat, target_lon
 def arm_takeoff(altitude, vehicle): # in feet
     convertedAlt = altitude * 0.3048 # in meters
 
@@ -139,8 +167,7 @@ def set_mode(vehicle, mode):
     mode = mode.upper()
     print(f"Start set to {mode}")
     vehicle.mode = VehicleMode(mode)
-    vehicle.armed = False
-    while not vehicle.mode.name==mode and vehicle.armed:
+    while not vehicle.mode.name==mode:
         print(f"Setting {mode}")
         time.sleep(1)
     print(f"{mode} set worked: drone mode is {vehicle.mode.name}!") #checking to make sure it is set
@@ -206,19 +233,23 @@ print("Control effects set")
 #! 5.------ SEARCH SETUP ------
 found_targets = []  # store detected target IDs
 dx, dy = 0, 0
+font = cv.FONT_HERSHEY_SIMPLEX
 
 CENTER_THRESHOLD = 100  # pixel amt to be centered
-MOVE_TIME = 3 # sec, how long drone has to move
+MOVE_TIME = 2 # sec, how long drone has to move
 STEP_LENGTH = 2  # ft, how far mvm is when detected
 STEP_SPEED = 1.5 # m/s, GROUND speed for mvm to coordinate
-TARGET_COOLDOWN = 5 # sec, how long drone has before checking for POIs again
+TARGET_COOLDOWN = 5 # sec, how long drone waits before checking for POIs again
+CENTERING_TIMEOUT = 30 #sec, how long it takes to try and center
 print("Search initated")
 
+# COOLDOWNS/TIMERS
 moving = None
 scan_cd = None # target cooldown to not keep scanning same thing
+center_cd = None # checks center cooldown
+current_target = None
 
 #! 6.------ SEARCH ------
-# attempt @ FSM
 try:
     while True:
         #! EACH FRAME, WRITES CAPTURE AND GREEN FILTER
@@ -255,6 +286,7 @@ try:
         #! AUTO SURVEY WHILE WAYPOINT TAKES CONTROL
         if drone.mode.name == 'AUTO':
             if len(contours) != 0 and moving is None:
+                #! SCAN COOLDOWN TO NOT SCAN SAME THING
                 if scan_cd is not None:
                     if time.time() >= scan_cd:
                         scan_cd = None
@@ -268,13 +300,43 @@ try:
                     target_id = detect[0]
                     matches = detect[1]
                     frame = cv.drawMatches(templates[target_id], siftKP[target_id], frame, kp, matches, None, flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+                    
                     target_name = Targets(target_id).name
                     if target_id in found_targets:
-                        print(f"Already found target  {target_id}: {target_name}, ignore ts")
+                        print(f"Already found target {target_id}: {target_name}, ignore ts")
+                        set_mode(drone, 'AUTO')
+                        scan_cd = time.time() + TARGET_COOLDOWN
                         continue
                     print(f"New target {target_id}: {target_name} found")
 
-                    # center offsets
+                    if current_target != target_id:
+                        current_target = target_id
+                        center_cd = time.time() + CENTERING_TIMEOUT
+                        print(f"Checking centering for target {target_id}")
+
+                    if center_cd != None and time.time() >= center_cd:
+                        print(f"Centering (current: {current_target} for id: {target_id} TIMEOUT")
+                        print(f"GPS coordinate: lat:{drone.location.global_frame.lat}, lon:{drone.location.global_frame.lon}")
+                        scan_cd = time.time() + TARGET_COOLDOWN
+                        current_target = None
+                        set_mode(drone, 'AUTO')
+                        continue
+
+                    # experimental get approx. side length
+                    contour = contours[0]
+                    epsilon = .02 * cv.arcLength(contour, True)
+                    approx = cv.approxPolyDP(contour, epsilon, True)
+
+                    pts = approx.reshape(4,2)
+                    side1 = np.linalg.norm(pts[0] - pts[1])
+                    side2 = np.linalg.norm(pts[1] - pts[2])
+                    side3 = np.linalg.norm(pts[2] - pts[3])
+                    side4 = np.linalg.norm(pts[3] - pts[0])
+
+                    avg_side = (side1 + side2 + side3 + side4) / 4
+                    # end experimental
+
+                    # center offsets, IMPORTANT DONT COMMENT OUT
                     M = cv.moments(contours[0])
                     targetX = int(M["m10"] / M["m00"])
                     targetY = int(M["m01"] / M["m00"])
@@ -283,7 +345,17 @@ try:
                     dy = centerY - targetY
                     dist_from_center = math.hypot(dx, dy)
 
+                    # more experimental
+                    # we're guesstimating by calculating dx, dy pixels and converting them to GPS coordinates
+                    TARGET_SIDE_LENGTH = 4 # in ft
                     print(f"Target offset: dx={dx:.2f}, dy={dy:.2f}, dist={dist_from_center:.2f}")
+                    cv.putText(frame, f'dx, dy: {int(dx)}, {int(dy)}', (10, 70), font, 1, (0, 255, 255), 2, cv.LINE_4)
+                    dx_dist = (dx/avg_side) * TARGET_SIDE_LENGTH
+                    dy_dist = (dy/avg_side) * TARGET_SIDE_LENGTH
+                    approx_dist = (dist_from_center/avg_side) * TARGET_SIDE_LENGTH
+                    approx_lat, approx_lon = calculate_target_gps(drone, dx_dist, dy_dist)
+                    cv.putText(frame, f'~distToTarget: {int((dist_from_center/avg_side) * 4)}ft; ({approx_lat}, {approx_lon})', (10, 110), font, 1, (0, 255, 255), 2, cv.LINE_4)
+                    # end experimental
 
                     if dist_from_center > CENTER_THRESHOLD:
                         print("Try move over target")
@@ -306,6 +378,8 @@ try:
 
                         found_targets.append(target_id)
                         scan_cd = time.time() + TARGET_COOLDOWN
+                        current_target = None
+                        set_mode(drone, "AUTO")
 
             # potentilaly deprecated code...
             # kp, desc = sift.detectAndCompute(filtered, None)
@@ -315,6 +389,13 @@ try:
             #     detect = False
             # if detect:
             #     frame = cv.drawMatches(templates[detect[0]], siftKP[detect[0]], frame, kp, detect[1], None, flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+        
+        #! WRITE VALUES ON VIDEO
+        # lat_txt = drone.location.global_frame.lat
+        # lon_txt = drone.location.global_frame.lon
+        cv.putText(frame, f'GPS: ({drone.location.global_frame.lat}, {drone.location.global_frame.lon})', (10, 30), font, 1, (0, 255, 255), 2, cv.LINE_4)
+        
+        
         out.write(frame) # write out frame w/ debug lines
     
     print("Mission complete")
@@ -325,8 +406,9 @@ except Exception as e:
     tb = traceback.format_exc()
     print(tb)  # Or write to a log file
 
-
+out.release()
+vid.release()
 print("Preparing to return and land")
 set_mode(drone, "RTL")
-print("We done WOOOHOO")
+print("We done WOOOHOO (or not womp)")
 

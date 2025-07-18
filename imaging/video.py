@@ -1,5 +1,6 @@
 import os
 import numpy as np
+import math
 import cv2 as cv
 
 sift = cv.xfeatures2d.SIFT_create()
@@ -73,6 +74,7 @@ def findPOI(frame):
         validContours.append(contour)
     validContours.sort(key=lambda contour: -cv.contourArea(contour))
     return validContours
+font = cv.FONT_HERSHEY_SIMPLEX
 
 
 def main():
@@ -119,6 +121,19 @@ def main():
         frame = cv.drawContours(frame, contours, -1, (0, 255, 0), 2)
 
         if len(contours) != 0:
+            contour = contours[0]
+            epsilon = .02 * cv.arcLength(contour, True)
+            approx = cv.approxPolyDP(contour, epsilon, True)
+
+            pts = approx.reshape(4,2)
+            side1 = np.linalg.norm(pts[0] - pts[1])
+            side2 = np.linalg.norm(pts[1] - pts[2])
+            side3 = np.linalg.norm(pts[2] - pts[3])
+            side4 = np.linalg.norm(pts[3] - pts[0])
+
+            avg_side = (side1 + side2 + side3 + side4) / 4
+            cv.putText(frame, f'avgSize: {int(avg_side)}', (10, 110), font, 1, (0, 255, 255), 2, cv.LINE_4)
+
             M = cv.moments(contours[0])
             targetX = int(M["m10"] / M["m00"])
             targetY = int(M["m01"] / M["m00"])
@@ -126,6 +141,9 @@ def main():
             dx = centerX - targetX
             dy = centerY - targetY
             print("(" + str(dx) + ", " + str(dy) + ")")
+            cv.putText(frame, f'dx: {int(dx)}', (10, 30), font, 1, (0, 255, 255), 2, cv.LINE_4)
+            cv.putText(frame, f'dy: {int(dy)}', (10, 70), font, 1, (0, 255, 255), 2, cv.LINE_4)
+
 
         kp, desc = sift.detectAndCompute(filtered, None)
         if len(contours) != 0:
@@ -134,7 +152,7 @@ def main():
             detect = False
         if detect != False:
             frame = cv.drawMatches(templates[detect[0]], siftKP[detect[0]], frame, kp, detect[1], None, flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
-
+        
         out.write(frame)
         cv.imshow('stream', frame)
         if cv.waitKey(1) == ord('q'):

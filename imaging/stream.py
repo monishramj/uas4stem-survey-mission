@@ -128,6 +128,10 @@ def gen_frames():
             dy = centerY - targetY
             print("(" + str(dx) + ", " + str(dy) + ")")
 
+        font = cv.FONT_HERSHEY_SIMPLEX
+        cv.putText(frame, f'dx: {int(dx)}', (10, 30), font, 1, (0, 255, 255), 2, cv.LINE_4)
+        cv.putText(frame, f'dy: {int(dy)}', (10, 70), font, 1, (0, 255, 255), 2, cv.LINE_4)
+
         kp, desc = sift.detectAndCompute(filtered, None)
         if len(contours) != 0:
             detect = detectSIFT(filtered, contours[0])
