@@ -249,6 +249,7 @@ scan_cd = None # target cooldown to not keep scanning same thing
 center_cd = None # checks center cooldown
 current_target = None
 
+scan_cd = time.time() + TARGET_COOLDOWN
 #! 6.------ SEARCH ------
 try:
     while True:
