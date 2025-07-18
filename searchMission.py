@@ -349,10 +349,10 @@ try:
                     # we're guesstimating by calculating dx, dy pixels and converting them to GPS coordinates
                     TARGET_SIDE_LENGTH = 4 # in ft
                     print(f"Target offset: dx={dx:.2f}, dy={dy:.2f}, dist={dist_from_center:.2f}")
-                    cv.putText(frame, f'dx, dy: {int(dx)}, {int(dy)}', (10, 70), font, 1, (0, 255, 255), 2, cv.LINE_4)
                     dx_dist = (dx/avg_side) * TARGET_SIDE_LENGTH
                     dy_dist = (dy/avg_side) * TARGET_SIDE_LENGTH
                     approx_dist = (dist_from_center/avg_side) * TARGET_SIDE_LENGTH
+                    cv.putText(frame, f'dx, dy: {int(dx)}, {int(dy)}, real: {dx_dist}ft, {dy_dist}ft', (10, 70), font, 1, (0, 255, 255), 2, cv.LINE_4)
                     approx_lat, approx_lon = calculate_target_gps(drone, dx_dist, dy_dist)
                     cv.putText(frame, f'~distToTarget: {int((dist_from_center/avg_side) * 4)}ft; ({approx_lat}, {approx_lon})', (10, 110), font, 1, (0, 255, 255), 2, cv.LINE_4)
                     # end experimental
