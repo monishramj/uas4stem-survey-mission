@@ -224,6 +224,7 @@ font = cv.FONT_HERSHEY_SIMPLEX
 
 set_mode(drone, "AUTO")
 
+time.sleep(5)
 
 while True:
     # If RTL engaged, break
