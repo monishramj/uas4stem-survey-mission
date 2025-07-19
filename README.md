@@ -16,4 +16,6 @@ Various test programs created to iteratively build upon our code to test functio
 - [x] <ins>movementTest2.py</ins>: velocity based flight movement test. (UNUSED)
 - [x] <ins>waypointOverride.py</ins>: movement test to interrupt waypoint mission for code control. 
 - [x] <ins>imgRecognition.py</ins>: movement test including image recognition for obtaining POI coordinates.
-- [ ] (NEEDS TESTING) <ins>searchMission.py</ins>: search flight to accurately determine GPS coordinates for field POIs from waypoint mission.
+- [ ] (UNUSED) <ins>searchMission.py</ins>: search flight to accurately determine GPS coordinates for field POIs from waypoint mission.
+- [ ] (NEEDS TESTING) <ins>survey.py</ins>: modified search flight algorithm to determine GPS coordinates for field POIs from waypoint mission.
+- [ ] (NEEDS TESTING) <ins>visionMission.py</ins>: algorithm to identify field POIs and estimate GPS coordinates

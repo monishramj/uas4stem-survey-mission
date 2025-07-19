@@ -175,8 +175,6 @@ print("Connected BOOYAH!")
 #! 2.----- LAUNCH ------
 arm_takeoff(30, drone)
 
-set_mode(drone, "AUTO")
-
 #! 3.----- IMAGING SETUP -----
 print("Begin image setup")
 sift = cv.xfeatures2d.SIFT_create()
@@ -223,6 +221,9 @@ lon = 0
 target_id = -1
 target_name = ''
 font = cv.FONT_HERSHEY_SIMPLEX
+
+set_mode(drone, "AUTO")
+
 
 while True:
     # If RTL engaged, break
