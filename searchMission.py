@@ -108,7 +108,7 @@ def create_local_coordinate(vehicle, north, east, down): # function converts fee
 
     return LocationGlobal(final_lat, final_lon, final_alt)
 def calculate_target_gps(drone, dx_dist, dy_dist): # function takes in dx dy feet and gives new GPS coordinates
-    screen_angle = math.degrees(math.atan2(dy, dx))
+    screen_angle = math.degrees(math.atan2(dy_dist, dx_dist))
     global_angle_deg = -screen_angle + 90 + drone.heading
     global_angle_rad = math.radians(global_angle_deg)
 

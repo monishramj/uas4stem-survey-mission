@@ -134,7 +134,7 @@ def main():
         out.write(frame)
         cv.imshow('stream', frame)
         if cv.waitKey(1) == ord('q'):
-            break;
+            break
 
     out.release()
     vid.release()
