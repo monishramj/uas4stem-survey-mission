@@ -232,8 +232,6 @@ while True:
         print("RTL detected, mission END")
         break
     frame = vid.capture_array()
-    
-    cv.putText(frame, f'GPS: ({drone.location.global_frame.lat}, {drone.location.global_frame.lon})', (10, 30), font, 1, (0, 255, 255), 2, cv.LINE_4)
 
     # filter green
     filtered = cv.cvtColor(frame, cv.COLOR_BGR2HSV)
@@ -246,11 +244,14 @@ while True:
     filtered = cv.cvtColor(filtered, cv.COLOR_HSV2BGR)
     filtered = cv.cvtColor(filtered, cv.COLOR_BGR2GRAY)
 
+    cv.putText(frame, f'GPS: ({drone.location.global_frame.lat}, {drone.location.global_frame.lon})', (10, 30), font, 1, (0, 255, 255), 2, cv.LINE_4)
+
     #! EACH FRAME, CHECKS FOR POIS
     contours = findPOI(filtered)
     frame = cv.drawContours(frame, contours, -1, (0, 255, 0), 2)
 
-    if len(contours) != 0:                     
+    if len(contours) != 0:        
+        print("found something")             
         M = cv.moments(contours[0])
         targetX = int(M["m10"] / M["m00"])
         targetY = int(M["m01"] / M["m00"])
@@ -279,12 +280,14 @@ while True:
         target_id = detect[0]
         matches = detect[1]
         target_name = Targets(target_id).name
+        print(f"Target_name: {target_name}")
 
     cv.putText(frame, f'Target {target_id}: {target_name}', (10, 70), font, 1, (0, 255, 255), 2, cv.LINE_4)
     cv.putText(frame, f'Calculated GPS: ({lat}, {lon})', (10, 110), font, 1, (0, 255, 255), 2, cv.LINE_4)
+    cv.putText(frame, f'px: ({dx}, {dy}). ft: ({dx_dist}, {dy_dist}), off by {approx_dist}', (10, 110), font, 1, (0, 255, 255), 2, cv.LINE_4)
     out.write(frame)
     if cv.waitKey(1) == ord('q'):
-            break;
+            break
 
 out.release()
 print("Preparing to return and land")
